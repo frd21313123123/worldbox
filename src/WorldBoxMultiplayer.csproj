@@ -17,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="BepInEx"><HintPath>$(BepInExDir)/BepInEx.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameData)/UnityEngine.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameData)/UnityEngine.CoreModule.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameData)/UnityEngine.InputLegacyModule.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(GameData)/UnityEngine.IMGUIModule.dll</HintPath><Private>False</Private></Reference>
