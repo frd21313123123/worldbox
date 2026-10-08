@@ -9,6 +9,13 @@ namespace WorldBoxMultiplayer
     // This class must only be accessed on Unity's main thread.
     internal sealed class SteamSession
     {
+        // SteamNetworkingMessages returns a *native message pointer*. Releasing a
+        // marshalled struct can crash on some Steamworks.NET versions. Free the
+        // exact pointer delivered by ReceiveMessagesOnChannel.
+        [DllImport("steam_api64", CallingConvention = CallingConvention.Cdecl,
+            EntryPoint = "SteamAPI_SteamNetworkingMessage_t_Release")]
+        private static extern void ReleaseNativeMessage(IntPtr message);
+
         private sealed class SnapshotJob
         {
             internal byte[] Data;
@@ -160,8 +167,7 @@ namespace WorldBoxMultiplayer
                 finally
                 {
                     // Native SteamNetworkingMessage_t allocations require the native Release callback.
-                    SteamNetworkingMessage_t message = (SteamNetworkingMessage_t)Marshal.PtrToStructure(ptr, typeof(SteamNetworkingMessage_t));
-                    message.Release();
+                    ReleaseNativeMessage(ptr);
                     _received[i] = IntPtr.Zero;
                 }
             }
