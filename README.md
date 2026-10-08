@@ -1,6 +1,6 @@
 # WorldBox Gods Multiplayer, v0.3.0 (experimental)
 
-A source-available prototype of shared god powers over **Steam friends lobbies** for **WorldBox**. It has a **Worldfall 3D coexistence check**, explicit transfer of the host's saved world and automatic tests. It is **NOT a finished multiplayer mod** and is **not a tested game DLL**.
+An experimental binary-preview prototype of shared god powers over **Steam friends lobbies** for **WorldBox**. It has a **Worldfall 3D coexistence check**, explicit transfer of the host's saved world and automatic tests. It is **NOT a finished multiplayer mod**. GitHub Actions now compiles an **experimental DLL** against public Unity/BepInEx/Steamworks.NET references when CI passes, but that is NOT a tested or stable game DLL.
 
 ## What is actually implemented
 
@@ -19,10 +19,22 @@ A source-available prototype of shared god powers over **Steam friends lobbies**
 - World snapshot capture is performed on the game's main thread and may cause stutter for large maps. Current 64 MiB cap, retry/timeout limits and handshake validation are safety measures, not performance certification.
 - Host migration, drop-in join without map replacement, seamless resync during 3D possession and save completion confirmation are not implemented.
 
+## Install the experimental Windows preview (with your friend)
+
+1. Go to [Releases](https://github.com/frd21313123123/worldbox/releases) and download the **experimental-windows.zip** asset if it exists. A source-only release is not an installable mod.
+2. Both players must use the same WorldBox Steam build and install BepInEx 5 (Unity Mono, Windows x64) separately. **Back up your worlds** before launch.
+3. Close WorldBox. Extract the ZIP so its `BepInEx/plugins/WorldBoxMultiplayer/` folder is inside the WorldBox installation directory. If prompted, do not overwrite the game's unrelated libraries.
+4. Launch WorldBox from Steam on both systems. Check the BepInEx log for the multiplayer plugin initialization. If any `DllNotFoundException`, `TypeLoadException` or crash occurs, stop and preserve the log for debugging.
+5. Host: press **Ctrl+Shift+H**, invite your Steam friend with **Ctrl+Shift+I**. Guest accepts via Steam. Alternatively type lobby ID in the HUD and use **Join** or Ctrl+Shift+J.
+6. Both load or generate a world first. Guest may request the host's world, then explicitly confirm replacing their **unsaved** map. This is experimental. Check visible land and units on both screens.
+7. Send a permitted god power via the HUD or Ctrl+Shift+P. Coordinate entry is manual; there is currently no automatic pointer-to-world action streaming.
+
+**IMPORTANT:** The host and guest still run independent simulations after world transfer. Units, cities, AI, combat and economy may immediately diverge. Worldfall 3D is locally detected but remote 3D characters are NOT synchronized. Playing together as a fully shared world is NOT reliably supported yet. Do not use your only save.
+
 ## Installation and build (Windows)
 
 1. Install WorldBox from Steam and compatible [BepInEx 5](https://github.com/BepInEx/BepInEx) (the code is a **BepInEx plugin**, not a NeoModLoader plugin).
-2. Install .NET SDK 8 or newer and use the included script to compile against your *own installation's* Unity/BepInEx and a compatible Steamworks.NET assembly.
+2. Install .NET SDK 8 or newer and use the included script to compile against your *own installation's* Unity/BepInEx references. The project resolves Steamworks.NET 20.2.0 through NuGet; the old `-SteamDll` script argument is retained only for compatibility.
 3. Build/install with:
 
 ```powershell
@@ -83,8 +95,8 @@ dotnet run --project tests/GameAdapterContractTests.csproj -c Release
 ```
 
 - `.github/workflows/ci.yml`: runs these tests on push, pull request and manually, uploads source as an artifact even on failure.
-- A separate Windows job builds `WorldBoxMultiplayer.dll` **only when** the variable `ENABLE_GAME_BUILD=true` and private reference archive secrets are configured. See [docs/CI.md](docs/CI.md).
-- The workflow does not assume public permission to redistribute WorldBox or Worldfall DLLs. It will not fabricate a real game build from stubbed test assemblies.
+- A public-reference Windows job attempts to build and package an **experimental** `WorldBoxMultiplayer.dll` and Steamworks.NET managed runtime into a Windows ZIP on `main`. An additional private-reference build job is gated by `ENABLE_GAME_BUILD=true` and private reference archive secrets. See [docs/CI.md](docs/CI.md).
+- The workflow never redistributes WorldBox or Worldfall proprietary DLLs. Public Unity/BepInEx/Steamworks compilation checks are NOT evidence the plugin loads in the installed game.
 - Project repository: https://github.com/frd21313123123/worldbox . The `scripts/publish-to-github.ps1` helper is only for creating a separate new repository.
 
 ## Safety and limitations
