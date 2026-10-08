@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>WireTests</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/Wire.cs" Link="Wire.cs" />
+    <Compile Include="../src/SnapshotTransfer.cs" Link="SnapshotTransfer.cs" />
+    <Compile Include="../src/WorldfallCompatibility.cs" Link="WorldfallCompatibility.cs" />
+    <Compile Include="WireTests.cs" />
+  </ItemGroup>
+</Project>

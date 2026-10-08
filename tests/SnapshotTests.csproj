@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+<ItemGroup>
+ <Compile Include="../src/Wire.cs" Link="Wire.cs"/>
+ <Compile Include="../src/SnapshotTransfer.cs" Link="SnapshotTransfer.cs"/>
+ <Compile Include="SnapshotTests.cs"/>
+</ItemGroup>
+</Project>

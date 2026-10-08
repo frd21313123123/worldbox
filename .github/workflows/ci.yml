@@ -1,0 +1,89 @@
+name: WorldBox Multiplayer CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run protocol and Worldfall compatibility tests
+        run: dotnet run --project tests/WireTests.csproj --configuration Release
+      - name: Run snapshot framing and integrity tests
+        run: dotnet run --project tests/SnapshotTests.csproj --configuration Release
+
+      - name: Run WorldBox save/load contract tests (stubbed API)
+        run: dotnet run --project tests/GameAdapterContractTests.csproj --configuration Release
+      - name: Upload reproducible source tree
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorldBoxMultiplayer-source-${{ github.sha }}
+          path: |
+            src/
+            tests/
+            scripts/
+            docs/
+            README.md
+            BUILD_STATUS.md
+          if-no-files-found: error
+  game-dll:
+    name: Game DLL (requires private reference bundle)
+    needs: protocol-tests
+    # Never claim a release build when the target game's managed assemblies are missing.
+    if: ${{ vars.ENABLE_GAME_BUILD == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Retrieve privately hosted build-only reference assemblies
+        shell: pwsh
+        env:
+          WB_REFS_URL: ${{ secrets.WB_REFS_URL }}
+          WB_REFS_SHA256: ${{ secrets.WB_REFS_SHA256 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WB_REFS_URL) -or [string]::IsNullOrWhiteSpace($env:WB_REFS_SHA256)) {
+            throw 'Missing WB_REFS_URL or WB_REFS_SHA256 secret. See docs/CI.md.'
+          }
+          New-Item -ItemType Directory -Force -Path refs | Out-Null
+          Invoke-WebRequest -Uri $env:WB_REFS_URL -OutFile refs/input.zip -MaximumRedirection 2
+          $hash = (Get-FileHash refs/input.zip -Algorithm SHA256).Hash
+          if ($hash -ne $env:WB_REFS_SHA256.Trim()) { throw 'Reference archive SHA256 mismatch'; }
+          Expand-Archive -Path refs/input.zip -DestinationPath refs -Force
+          Remove-Item refs/input.zip
+          $required = @(
+            'refs/game/worldbox_Data/Managed/UnityEngine.CoreModule.dll',
+            'refs/game/worldbox_Data/Managed/UnityEngine.InputLegacyModule.dll',
+            'refs/game/worldbox_Data/Managed/UnityEngine.IMGUIModule.dll',
+            'refs/game/BepInEx/core/BepInEx.dll',
+            'refs/Steamworks.NET.dll'
+          )
+          foreach ($file in $required) { if (!(Test-Path $file)) { throw "Reference assembly missing: $file" } }
+      - name: Compile DLL
+        shell: pwsh
+        run: |
+          dotnet build src/WorldBoxMultiplayer.csproj -c Release -p:WorldBoxDir="$PWD/refs/game" -p:SteamDll="$PWD/refs/Steamworks.NET.dll" --warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Game DLL compilation failed' }
+          if (!(Test-Path src/bin/Release/net462/WorldBoxMultiplayer.dll)) { throw 'DLL output missing' }
+      - name: Publish DLL to workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorldBoxMultiplayer-${{ github.sha }}
+          path: src/bin/Release/net462/WorldBoxMultiplayer.dll
+          if-no-files-found: error
+          retention-days: 30

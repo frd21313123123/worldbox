@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+refs/
+*.user
+*.suo
+*.log
+*.zip
+*.dll
+.vs/
+.idea/
