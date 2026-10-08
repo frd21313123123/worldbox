@@ -106,7 +106,7 @@ jobs:
 
           # WorldBox 0.51.2 uses Unity 2022.3.60f1. Only general-purpose public
           # reference libraries are fetched. No WorldBox/Worldfall binaries.
-          Invoke-WebRequest 'https://unity.bepinex.dev/libraries/2022.3.60f1.zip' -OutFile 'refs/downloads/unity.zip'
+          Invoke-WebRequest 'https://unity.bepinex.dev/libraries/2022.3.60.zip' -OutFile 'refs/downloads/unity.zip'
           Expand-Archive 'refs/downloads/unity.zip' 'refs/downloads/unity' -Force
           $modules = @('UnityEngine.CoreModule.dll','UnityEngine.InputLegacyModule.dll','UnityEngine.IMGUIModule.dll')
           foreach ($module in $modules) {
