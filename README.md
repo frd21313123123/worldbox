@@ -68,6 +68,12 @@ WorldBox + optional Worldfall 3D  (host)
 
 Worldfall's 3D rendering is not changed: this plugin only exchanges Worldfall presence/version hints and works with underlying WorldBox state.
 
+## GitHub Releases (automatic experimental previews)
+
+Preview builds are published at [GitHub Releases](https://github.com/frd21313123123/worldbox/releases) **after** the main branch passes the full CI workflow. To publish another preview, update `VERSION` to a fresh `vX.Y.Z-preview.N` tag and push to `main`. The release publisher creates the corresponding tag at the **tested commit**, uploads a source ZIP and SHA-256 checksums, and includes `WorldBoxMultiplayer.dll` **only if** CI built it with legal private game references.
+
+No DLL is fabricated when reference secrets are missing. Such previews are explicitly marked **source-only** and **prerelease**, not stable or installable. Refer to [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) before any stable game release. For configuration, see [docs/CI.md](docs/CI.md).
+
 ## Test and CI
 
 ```powershell
