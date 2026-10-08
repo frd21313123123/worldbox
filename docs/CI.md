@@ -2,6 +2,17 @@
 
 **Hosted CI always runs protocol/Worldfall handshake tests.** A compiled **game DLL** requires private reference assemblies from the user's legitimate installation of WorldBox/BepInEx and a compatible Steamworks.NET DLL. Source control does not contain these assemblies.
 
+## Experimental public-reference build (no WorldBox binaries uploaded)
+
+On every push to `main`, the **public-game-dll** job downloads public Unity 2022.3.60, BepInEx 5.4.23.5 and Steamworks.NET references. It compiles `src/WorldBoxMultiplayer.csproj` targeting `netstandard2.1`, then packages:
+
+- `BepInEx/plugins/WorldBoxMultiplayer/WorldBoxMultiplayer.dll`
+- `BepInEx/plugins/WorldBoxMultiplayer/Steamworks.NET.dll`
+
+as a `WorldBoxMultiplayer-experimental-windows.zip` GitHub Actions artifact. On a new `VERSION` value, a successful CI run publishes the ZIP into a GitHub **prerelease**, together with sources and SHA-256 checksums. It never includes or redistributes WorldBox or Worldfall DLLs. Do not treat compilation as validation of multiplayer behavior.
+
+**Known limitations:** Host save transfer is opt-in, but AI/actor/city replication beyond powers remains unimplemented. Worldfall's networked possession/3D avatars are also unimplemented. A plugin that compiles may still crash when loaded by a particular game build. Always back up world saves.
+
 ## GitHub repository
 
 Source is maintained at https://github.com/frd21313123123/worldbox. Do not upload proprietary WorldBox or Worldfall assemblies to the public repository.
