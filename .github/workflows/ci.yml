@@ -110,7 +110,7 @@ jobs:
           # reference libraries are fetched. No WorldBox/Worldfall binaries.
           Invoke-WebRequest 'https://unity.bepinex.dev/libraries/2022.3.60.zip' -OutFile 'refs/downloads/unity.zip'
           Expand-Archive 'refs/downloads/unity.zip' 'refs/downloads/unity' -Force
-          $modules = @('UnityEngine.CoreModule.dll','UnityEngine.InputLegacyModule.dll','UnityEngine.IMGUIModule.dll')
+          $modules = @('UnityEngine.dll','UnityEngine.CoreModule.dll','UnityEngine.InputLegacyModule.dll','UnityEngine.IMGUIModule.dll')
           foreach ($module in $modules) {
             $assembly = Get-ChildItem 'refs/downloads/unity' -Filter $module -File -Recurse | Select-Object -First 1
             if ($null -eq $assembly) { throw "Unity reference $module unavailable" }
