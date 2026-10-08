@@ -1,0 +1,147 @@
+name: Publish preview release
+
+on:
+  workflow_run:
+    workflows: ['WorldBox Multiplayer CI']
+    types: [completed]
+
+# Release only the exact SHA that passed CI on our own main branch.
+# Never run privileged release operations for pull requests or forks.
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-preview
+  cancel-in-progress: false
+
+jobs:
+  release-preview:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Verify preview version and check for an existing release
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ ! -f VERSION ]; then
+            echo "No VERSION file, skipping release."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TAG="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(preview|alpha|beta|rc)\.[0-9]+$ ]]; then
+            echo "::error::VERSION must be a prerelease tag such as v0.3.1-preview.1. Stable releases require separate game validation."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; bump VERSION for another release."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Avoid silently pointing a published version at an existing, different git tag.
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists but has no release. Inspect it manually to avoid overwriting versions."
+            exit 1
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Package reproducible source
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=zip --output="dist/WorldBoxMultiplayer-$RELEASE_TAG-source.zip" HEAD
+
+      - name: Include compiled DLL only if the successful CI run produced one
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          ARTIFACT="WorldBoxMultiplayer-$RUN_SHA"
+          if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
+              --jq '.artifacts[].name' | grep -Fxq "$ARTIFACT"; then
+            mkdir -p dist/compiled
+            gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "$ARTIFACT" --dir dist/compiled
+            test -s dist/compiled/WorldBoxMultiplayer.dll
+            cp dist/compiled/WorldBoxMultiplayer.dll dist/WorldBoxMultiplayer.dll
+          else
+            echo "No compiled game DLL artifact: publish source-only experimental preview."
+          fi
+
+      - name: Write release notes and checksums
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ -s dist/WorldBoxMultiplayer.dll ]; then
+            ASSET_STATUS="An automatically compiled game DLL is attached. It is UNTESTED in a live WorldBox/Steam/Worldfall session; do not treat it as a stable build."
+          else
+            ASSET_STATUS="SOURCE-ONLY PREVIEW: No working game DLL is attached. Configure the private WorldBox reference bundle to enable DLL compilation."
+          fi
+          cat > dist/RELEASE_NOTES.md <<EOF
+          ## WorldBox Gods Multiplayer $RELEASE_TAG (experimental)
+
+          **Not a completed playable multiplayer mod.** Steam lobby and powers relay, opt-in save exchange, and Worldfall presence checks are experimental. Continuous AI/actor/city synchronization and Worldfall 3D remote avatars remain unimplemented.
+
+          $ASSET_STATUS
+
+          Verified source commit: `$TESTED_SHA`
+          GitHub Actions: $RUN_URL
+
+          Install only a game DLL compiled against your own supported WorldBox installation. The source ZIP is **not an installable mod**.
+
+          See [limitations and installation](https://github.com/$GITHUB_REPOSITORY#readme) and [release checklist](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/RELEASE_CHECKLIST.md).
+          EOF
+          (
+            cd dist
+            sha256sum WorldBoxMultiplayer-*-source.zip
+            if [ -s WorldBoxMultiplayer.dll ]; then sha256sum WorldBoxMultiplayer.dll; fi
+          ) > dist/SHA256SUMS.txt
+
+      - name: Publish GitHub prerelease
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          FILES=(dist/WorldBoxMultiplayer-*-source.zip dist/SHA256SUMS.txt)
+          if [ -s dist/WorldBoxMultiplayer.dll ]; then
+            FILES+=(dist/WorldBoxMultiplayer.dll)
+          fi
+          gh release create "$RELEASE_TAG" "${FILES[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$TESTED_SHA" \
+            --title "WorldBox Multiplayer $RELEASE_TAG (experimental)" \
+            --notes-file dist/RELEASE_NOTES.md \
+            --prerelease
