@@ -87,3 +87,77 @@ jobs:
           path: src/bin/Release/net462/WorldBoxMultiplayer.dll
           if-no-files-found: error
           retention-days: 30
+
+  public-game-dll:
+    name: Compile game DLL against public references (not an in-game test)
+    needs: protocol-tests
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Prepare public Unity, BepInEx and Steamworks.NET compilation references
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -Force -ItemType Directory 'refs/game/worldbox_Data/Managed', 'refs/game/BepInEx/core', 'refs/downloads' | Out-Null
+
+          # WorldBox 0.51.2 uses Unity 2022.3.60f1. Only general-purpose public
+          # reference libraries are fetched. No WorldBox/Worldfall binaries.
+          Invoke-WebRequest 'https://unity.bepinex.dev/libraries/2022.3.60f1.zip' -OutFile 'refs/downloads/unity.zip'
+          Expand-Archive 'refs/downloads/unity.zip' 'refs/downloads/unity' -Force
+          $modules = @('UnityEngine.CoreModule.dll','UnityEngine.InputLegacyModule.dll','UnityEngine.IMGUIModule.dll')
+          foreach ($module in $modules) {
+            $assembly = Get-ChildItem 'refs/downloads/unity' -Filter $module -File -Recurse | Select-Object -First 1
+            if ($null -eq $assembly) { throw "Unity reference $module unavailable" }
+            Copy-Item $assembly.FullName ('refs/game/worldbox_Data/Managed/' + $module)
+          }
+
+          Invoke-WebRequest 'https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5.zip' -OutFile 'refs/downloads/bepinex.zip'
+          Expand-Archive 'refs/downloads/bepinex.zip' 'refs/downloads/bepinex' -Force
+          $bep = Get-ChildItem 'refs/downloads/bepinex' -Filter BepInEx.dll -File -Recurse | Select-Object -First 1
+          if ($null -eq $bep) { throw 'BepInEx.dll missing from upstream distribution' }
+          Copy-Item $bep.FullName 'refs/game/BepInEx/core/BepInEx.dll'
+
+          Invoke-WebRequest 'https://github.com/rlabrecque/Steamworks.NET/releases/download/2025.164.1/Steamworks.NET-Standalone_2025.164.1.zip' -OutFile 'refs/downloads/steamworks.zip'
+          Expand-Archive 'refs/downloads/steamworks.zip' 'refs/downloads/steamworks' -Force
+          $steam = Get-ChildItem 'refs/downloads/steamworks' -Filter Steamworks.NET.dll -File -Recurse | Sort-Object FullName | Select-Object -First 1
+          if ($null -eq $steam) { throw 'Steamworks.NET.dll missing from upstream distribution' }
+          Copy-Item $steam.FullName 'refs/Steamworks.NET.dll'
+          Get-ChildItem 'refs/game/worldbox_Data/Managed','refs/game/BepInEx/core','refs/Steamworks.NET.dll' | Select-Object FullName, Length
+
+      - name: Compile BepInEx mod
+        shell: pwsh
+        run: |
+          dotnet build src/WorldBoxMultiplayer.csproj --configuration Release -p:WorldBoxDir="$PWD/refs/game" -p:SteamDll="$PWD/refs/Steamworks.NET.dll"
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation failed: do not publish a fabricated binary' }
+          if (!(Test-Path 'src/bin/Release/net462/WorldBoxMultiplayer.dll')) { throw 'Game DLL not produced' }
+
+      - name: Package experimental plugin (never include reference game libraries)
+        shell: pwsh
+        run: |
+          $dir = 'dist/BepInEx/plugins/WorldBoxMultiplayer'
+          New-Item -Force -ItemType Directory $dir | Out-Null
+          Copy-Item 'src/bin/Release/net462/WorldBoxMultiplayer.dll' "$dir/"
+          Copy-Item 'refs/Steamworks.NET.dll' "$dir/"
+          @'
+          WORLDBOX MULTIPLAYER - EXPERIMENTAL BUILD (NOT A STABLE RELEASE)
+          Install BepInEx 5 separately. Copy the BepInEx folder from this archive
+          into your WorldBox game directory. Run the game from Steam.
+          WARNING: Steam multiplayer, simulation consistency, and Worldfall 3D
+          remote characters have NOT been tested and are NOT feature-complete.
+          The plugin may fail to load. Back up your worlds before testing.
+          '@ | Set-Content 'dist/README-INSTALL.txt'
+          Compress-Archive -Path 'dist/BepInEx','dist/README-INSTALL.txt' -DestinationPath 'dist/WorldBoxMultiplayer-experimental-windows.zip' -Force
+          Get-FileHash 'dist/WorldBoxMultiplayer-experimental-windows.zip' -Algorithm SHA256 | Format-List
+      - name: Upload experimental DLL and installer ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorldBoxMultiplayer-testbuild-${{ github.sha }}
+          path: |
+            dist/WorldBoxMultiplayer-experimental-windows.zip
+            src/bin/Release/net462/WorldBoxMultiplayer.dll
+          if-no-files-found: error
+          retention-days: 30
