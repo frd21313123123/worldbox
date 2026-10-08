@@ -33,6 +33,11 @@ namespace WorldBoxMultiplayer
                 if (tileMap == null) throw new Exception("World tiles not loaded");
                 object tile = tileMap.GetValue(x, y);
                 if (tile == null) throw new Exception("Tile is null");
+                // Creature ids are ActorAssets, not necessarily GodPower ids.
+                // Use the game's ActorManager API for creature spawning, including dragons.
+                if (id == "human" || id == "elf" || id == "orc" || id == "dwarf" ||
+                    id == "sheep" || id == "wolf" || id == "dragon")
+                    return SpawnActor(mapType, map, tile, id);
                 object powers = ReadField(assets, null, "powers");
                 if (powers == null) throw new Exception("AssetManager.powers missing");
                 MethodInfo get = powers.GetType().GetMethod("get", All, null, new [] { typeof(string) }, null);
@@ -53,6 +58,38 @@ namespace WorldBoxMultiplayer
                 LastError = (e.InnerException ?? e).Message;
                 return false;
             }
+        }
+        private bool SpawnActor(Type mapType, object map, object tile, string id)
+        {
+            object manager = ReadField(mapType, map, "units");
+            if (manager == null) throw new InvalidOperationException("WorldBox ActorManager missing");
+            MethodInfo method = null;
+            foreach (MethodInfo candidate in manager.GetType().GetMethods(All))
+            {
+                if (candidate.Name != "spawnNewUnit") continue;
+                ParameterInfo[] ps = candidate.GetParameters();
+                if (ps.Length < 2 || ps[0].ParameterType != typeof(string) ||
+                    !ps[1].ParameterType.IsInstanceOfType(tile)) continue;
+                method = candidate;
+                break;
+            }
+            if (method == null) throw new MissingMethodException("ActorManager.spawnNewUnit API changed");
+            ParameterInfo[] parameters = method.GetParameters();
+            var args = new object[parameters.Length];
+            args[0] = id;
+            args[1] = tile;
+            for (int i = 2; i < args.Length; i++)
+            {
+                // Use the game's own default parameters. Never guess an incompatible
+                // complex Subspecies or owner data object from untrusted network input.
+                args[i] = parameters[i].HasDefaultValue
+                    ? parameters[i].DefaultValue
+                    : (parameters[i].ParameterType.IsValueType
+                        ? Activator.CreateInstance(parameters[i].ParameterType) : null);
+            }
+            object spawned = method.Invoke(manager, args);
+            if (spawned == null) { LastError = "Actor spawn rejected by WorldBox"; return false; }
+            return true;
         }
         private static object ReadField(Type type, object obj, string name)
         {
