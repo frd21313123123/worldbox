@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Assembly-CSharp</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/WorldPowers.cs" Link="WorldPowers.cs" />
+    <Compile Include="PowerContractTests.cs" />
+  </ItemGroup>
+</Project>
