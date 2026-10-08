@@ -27,6 +27,8 @@ jobs:
 
       - name: Run WorldBox save/load contract tests (stubbed API)
         run: dotnet run --project tests/GameAdapterContractTests.csproj --configuration Release
+      - name: Run god-power and ActorManager reflective contract tests (stubbed API)
+        run: dotnet run --project tests/PowerContractTests.csproj --configuration Release
       - name: Upload reproducible source tree
         if: always()
         uses: actions/upload-artifact@v4
