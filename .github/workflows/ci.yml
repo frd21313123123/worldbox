@@ -123,10 +123,11 @@ jobs:
           if ($null -eq $bep) { throw 'BepInEx.dll missing from upstream distribution' }
           Copy-Item $bep.FullName 'refs/game/BepInEx/core/BepInEx.dll'
 
-          Invoke-WebRequest 'https://github.com/rlabrecque/Steamworks.NET/releases/download/2025.164.1/Steamworks.NET-Standalone_2025.164.1.zip' -OutFile 'refs/downloads/steamworks.zip'
+          Invoke-WebRequest 'https://github.com/rlabrecque/Steamworks.NET/releases/download/20.2.0/Steamworks.NET-Standalone_20.2.0.zip' -OutFile 'refs/downloads/steamworks.zip'
           Expand-Archive 'refs/downloads/steamworks.zip' 'refs/downloads/steamworks' -Force
           $steam = Get-ChildItem 'refs/downloads/steamworks' -Filter Steamworks.NET.dll -File -Recurse | Sort-Object FullName | Select-Object -First 1
           if ($null -eq $steam) { throw 'Steamworks.NET.dll missing from upstream distribution' }
+          Write-Host ('Selected Steamworks.NET: ' + $steam.FullName)
           Copy-Item $steam.FullName 'refs/Steamworks.NET.dll'
           Get-ChildItem 'refs/game/worldbox_Data/Managed','refs/game/BepInEx/core','refs/Steamworks.NET.dll' | Select-Object FullName, Length
 
