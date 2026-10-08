@@ -81,12 +81,12 @@ jobs:
         run: |
           dotnet build src/WorldBoxMultiplayer.csproj -c Release -p:WorldBoxDir="$PWD/refs/game" -p:SteamDll="$PWD/refs/Steamworks.NET.dll" --warnaserror
           if ($LASTEXITCODE -ne 0) { throw 'Game DLL compilation failed' }
-          if (!(Test-Path src/bin/Release/net462/WorldBoxMultiplayer.dll)) { throw 'DLL output missing' }
+          if (!(Test-Path src/bin/Release/netstandard2.1/WorldBoxMultiplayer.dll)) { throw 'DLL output missing' }
       - name: Publish DLL to workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: WorldBoxMultiplayer-${{ github.sha }}
-          path: src/bin/Release/net462/WorldBoxMultiplayer.dll
+          path: src/bin/Release/netstandard2.1/WorldBoxMultiplayer.dll
           if-no-files-found: error
           retention-days: 30
 
@@ -136,15 +136,16 @@ jobs:
         run: |
           dotnet build src/WorldBoxMultiplayer.csproj --configuration Release -p:WorldBoxDir="$PWD/refs/game" -p:SteamDll="$PWD/refs/Steamworks.NET.dll"
           if ($LASTEXITCODE -ne 0) { throw 'Compilation failed: do not publish a fabricated binary' }
-          if (!(Test-Path 'src/bin/Release/net462/WorldBoxMultiplayer.dll')) { throw 'Game DLL not produced' }
+          if (!(Test-Path 'src/bin/Release/netstandard2.1/WorldBoxMultiplayer.dll')) { throw 'Game DLL not produced' }
+          if (!(Test-Path 'src/bin/Release/netstandard2.1/Steamworks.NET.dll')) { throw 'Steamworks.NET runtime dependency not copied' }
 
       - name: Package experimental plugin (never include reference game libraries)
         shell: pwsh
         run: |
           $dir = 'dist/BepInEx/plugins/WorldBoxMultiplayer'
           New-Item -Force -ItemType Directory $dir | Out-Null
-          Copy-Item 'src/bin/Release/net462/WorldBoxMultiplayer.dll' "$dir/"
-          Copy-Item 'refs/Steamworks.NET.dll' "$dir/"
+          Copy-Item 'src/bin/Release/netstandard2.1/WorldBoxMultiplayer.dll' "$dir/"
+          Copy-Item 'src/bin/Release/netstandard2.1/Steamworks.NET.dll' "$dir/"
           @'
           WORLDBOX MULTIPLAYER - EXPERIMENTAL BUILD (NOT A STABLE RELEASE)
           Install BepInEx 5 separately. Copy the BepInEx folder from this archive
@@ -161,6 +162,6 @@ jobs:
           name: WorldBoxMultiplayer-testbuild-${{ github.sha }}
           path: |
             dist/WorldBoxMultiplayer-experimental-windows.zip
-            src/bin/Release/net462/WorldBoxMultiplayer.dll
+            src/bin/Release/netstandard2.1/WorldBoxMultiplayer.dll
           if-no-files-found: error
           retention-days: 30
