@@ -70,7 +70,7 @@ jobs:
           mkdir -p dist
           git archive --format=zip --output="dist/WorldBoxMultiplayer-$RELEASE_TAG-source.zip" HEAD
 
-      - name: Include compiled DLL only if the successful CI run produced one
+      - name: Attach only the exact tested CI's compiled build, when available
         if: steps.version.outputs.publish == 'true'
         shell: bash
         env:
@@ -79,16 +79,21 @@ jobs:
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          ARTIFACT="WorldBoxMultiplayer-$RUN_SHA"
+          # Preferred artifact contains the executable Windows installer layout.
+          ARTIFACT="WorldBoxMultiplayer-testbuild-$RUN_SHA"
           if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
               --jq '.artifacts[].name' | grep -Fxq "$ARTIFACT"; then
             mkdir -p dist/compiled
             gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" \
               --name "$ARTIFACT" --dir dist/compiled
-            test -s dist/compiled/WorldBoxMultiplayer.dll
-            cp dist/compiled/WorldBoxMultiplayer.dll dist/WorldBoxMultiplayer.dll
+            BUILT_ZIP="$(find dist/compiled -type f -name 'WorldBoxMultiplayer-experimental-windows.zip' -print -quit)"
+            BUILT_DLL="$(find dist/compiled -type f -name 'WorldBoxMultiplayer.dll' -print -quit)"
+            test -n "$BUILT_ZIP" && test -s "$BUILT_ZIP"
+            test -n "$BUILT_DLL" && test -s "$BUILT_DLL"
+            cp "$BUILT_ZIP" dist/WorldBoxMultiplayer-experimental-windows.zip
+            cp "$BUILT_DLL" dist/WorldBoxMultiplayer.dll
           else
-            echo "No compiled game DLL artifact: publish source-only experimental preview."
+            echo "No compiled experimental Windows installer from this exact CI run."
           fi
 
       - name: Write release notes and checksums
@@ -100,8 +105,8 @@ jobs:
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          if [ -s dist/WorldBoxMultiplayer.dll ]; then
-            ASSET_STATUS="An automatically compiled game DLL is attached. It is UNTESTED in a live WorldBox/Steam/Worldfall session; do not treat it as a stable build."
+          if [ -s dist/WorldBoxMultiplayer-experimental-windows.zip ]; then
+            ASSET_STATUS="An experimental Windows plugin ZIP and compiled DLL are attached. Neither has passed a live WorldBox/Steam/Worldfall two-computer test. This is NOT a stable release."
           else
             ASSET_STATUS="SOURCE-ONLY PREVIEW: No working game DLL is attached. Configure the private WorldBox reference bundle to enable DLL compilation."
           fi
@@ -123,6 +128,7 @@ jobs:
             cd dist
             sha256sum WorldBoxMultiplayer-*-source.zip
             if [ -s WorldBoxMultiplayer.dll ]; then sha256sum WorldBoxMultiplayer.dll; fi
+            if [ -s WorldBoxMultiplayer-experimental-windows.zip ]; then sha256sum WorldBoxMultiplayer-experimental-windows.zip; fi
           ) > dist/SHA256SUMS.txt
 
       - name: Publish GitHub prerelease
@@ -137,7 +143,7 @@ jobs:
           shopt -s nullglob
           FILES=(dist/WorldBoxMultiplayer-*-source.zip dist/SHA256SUMS.txt)
           if [ -s dist/WorldBoxMultiplayer.dll ]; then
-            FILES+=(dist/WorldBoxMultiplayer.dll)
+            FILES+=(dist/WorldBoxMultiplayer.dll dist/WorldBoxMultiplayer-experimental-windows.zip)
           fi
           gh release create "$RELEASE_TAG" "${FILES[@]}" \
             --repo "$GITHUB_REPOSITORY" \
