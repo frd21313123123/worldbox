@@ -22,7 +22,7 @@ static class SnapshotTestProgram
             byte[] chunk = SnapshotTransfer.Chunk(22, i, bytes);
             Check(collector.Add(chunk), "chunk " + i);
         }
-        byte[] output;
+        byte[] output = Array.Empty<byte>();
         Check(collector.Complete && collector.TryFinish(out output), "all chunks verify sha256");
         Check(output.Length == bytes.Length && SnapshotTransfer.Sha256(output) == sha, "roundtrip integrity");
         Check(collector.Add(SnapshotTransfer.Chunk(22, 0, bytes)) && collector.ReceivedChunks == count, "duplicate idempotence");
